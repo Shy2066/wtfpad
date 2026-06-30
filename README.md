@@ -1,3 +1,13 @@
+
+CUDA_VISIBLE_DEVICES=1 python src/main.py /home/shy/Project/dataset/tor_fiber -c normal_rcv
+python src/tools/extract_timings.py /home/shy/Project/dataset/tor_fiber -o dump
+
+# 1. 先运行 WTF-PAD 生成防御后的 trace
+python src/main.py -c normal_rcv /home/shy/Project/dataset/tor_fiber
+
+# 2. 计算开销（假设结果目录为 results/normal_rcv_260630_120000）
+python src/overheads.py /home/shy/Project/dataset/tor_fiber results/default_260630_111425
+
 # WTF-PAD
 
 ![DISCLAIMER](https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Dialog-warning-orange.svg/40px-Dialog-warning-orange.svg.png "experimental")    **experimental - PLEASE BE CAREFUL. Intended for reasearch purposes only.**

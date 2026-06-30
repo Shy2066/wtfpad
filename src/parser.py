@@ -13,8 +13,8 @@ def parse(fpath):
     t = Trace()
     for line in open(fpath):
         timestamp, length = line.strip().split(ct.TRACE_SEP)
-        direction = int(length) / abs(int(length))
-        t.append(Packet(float(timestamp), direction, int(length)))
+        direction = int(float(length)) / abs(int(float(length)))
+        t.append(Packet(float(timestamp), direction, int(float(length))))
     return t
 
 
