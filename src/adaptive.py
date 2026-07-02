@@ -1,7 +1,7 @@
 from os.path import join
 
 import numpy as np
-from math import sqrt, pi, ceil
+from math import sqrt, pi, ceil, floor
 from scipy.stats import norm
 from bisect import insort_left
 
@@ -33,17 +33,44 @@ class AdaptiveSimulator(object):
         self.stop_on_real = bool(config.get('stop_on_real', True))
         self.percentile = float(config.get('percentile', 0))
 
-        # the distribution of packet lengths is fixed in Tor
-        self.length_distrib = histo.uniform(ct.MTU)
+        # packet length for output traces (default 1 = unit placeholder,
+        # matching the input trace convention where ±1 encodes direction)
+        pkt_len = int(config.get('pkt_length', 1))
+        self.length_distrib = histo.uniform(pkt_len)
+
+        # target bandwidth overhead control
+        self.target_overhead = None
+        self.max_dummies = float('inf')
+        self.dummy_count = 0
+        target_ovhd = config.get('target_overhead', None)
+        if target_ovhd is not None:
+            self.target_overhead = float(target_ovhd)
 
         # initialize dictionary of distributions
         distributions = {k: v for k, v in config.items() if 'dist' in k}
         self.hist = self.initialize_distributions(distributions)
 
+    def set_target_overhead(self, target_overhead):
+        """Set the target bandwidth overhead ratio (e.g. 1.18 = 18% overhead)."""
+        if target_overhead is not None:
+            if target_overhead <= 1.0:
+                raise ValueError("target_overhead must be > 1.0")
+            self.target_overhead = target_overhead
+
+    def reset_dummy_count(self, total_real_packets):
+        """Reset dummy counter and compute max dummies for this trace."""
+        self.dummy_count = 0
+        if self.target_overhead is not None:
+            self.max_dummies = int(floor((self.target_overhead - 1) * total_real_packets))
+        else:
+            self.max_dummies = float('inf')
+
     def simulate(self, trace):
         """Adaptive padding simulation of a trace."""
         flows = {IN: Flow(IN), OUT: Flow(OUT)}
 
+        # reset dummy counter for this trace
+        self.reset_dummy_count(len(trace))
 
         for i, packet in enumerate(trace):
             logger.debug("Packet %s: %s" % (i, packet))
@@ -91,6 +118,10 @@ class AdaptiveSimulator(object):
         # if iat <= 0 we do not have space for a dummy
         if not iat <= 0:
             if timeout < iat:
+                # check if we have reached the dummy limit
+                if self.dummy_count >= self.max_dummies:
+                    return
+
                 logger.debug("timeout = %s  < %s = iat", timeout, iat)
 
                 # timeout has expired
@@ -155,6 +186,7 @@ class AdaptiveSimulator(object):
         """Set properties for dummy packet."""
         ts = packet.timestamp + timeout
         l = self.length_distrib.random_sample()
+        self.dummy_count += 1
         return Packet(ts, flow.direction, l, dummy=True)
 
     def sum_noinf_toks(self, h):

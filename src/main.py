@@ -45,6 +45,10 @@ def main():
     # Instantiate a new adaptive padding object
     wtfpad = ap.AdaptiveSimulator(config)
 
+    # configure target overhead if specified
+    if wtfpad.target_overhead is not None:
+        logger.info("Target bandwidth overhead: %s", wtfpad.target_overhead)
+
     # Run simulation on all traces
     latencies, bandwidths = [], []
     for fname in listdir(args.traces_path):
@@ -57,7 +61,7 @@ def main():
         dump(simulated, join(output_dir, fname))
 
         # calculate overheads
-        bw_ovhd = oh.bandwidth_ovhd(simulated, trace)
+        bw_ovhd = oh.bandwidth_ovhd_increase(simulated, trace)
         bandwidths.append(bw_ovhd)
         logger.debug("Bandwidth overhead: %s" % bw_ovhd)
 
